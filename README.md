@@ -25,9 +25,9 @@ A zero-shot rollout from the GR00T-N1.7-3B base model. The robot is in Isaac Lab
 The motion is exploratory rather than task-completing because:
 
 1. The rollout feeds zeroed joint state to the policy. The policy was trained to read its own arm and hand state. Wiring Isaac Lab's real `robot.data.joint_pos` into the GR00T schema makes the actions far more directed.
-2. NVIDIA published `nvidia/GR00T-N1.6-G1-PnPAppleToPlate`, a checkpoint specifically post-trained on this exact pick-place task. That checkpoint produces a clean grasp out of the box and is available as Path B in this repo.
+2. NVIDIA published `nvidia/GR00T-N1.6-G1-PnPAppleToPlate`, a checkpoint specifically post-trained on this exact pick-place task. Swapping that checkpoint into the same Ray Serve deployment is a one-line change.
 
-Both improvements land on the same Ray Serve infrastructure shown above. The model swap is a one-line change.
+The platform stays the same. The model swap is a one-line change.
 
 ## Why this is interesting
 
@@ -42,37 +42,30 @@ Ray Serve handles GR00T inference scaling. Ray tasks fan out the Isaac Lab simul
 ## Repo layout
 
 ```
-groot_demo.ipynb                 The notebook. Open this and run top to bottom.
+groot_demo.ipynb            The demo notebook. Open this and run top to bottom.
+architecture.svg            Architecture diagram embedded in the README.
+g1_groot_n17_zeroshot.gif   Pre-recorded rollout displayed in the notebook.
 
-path_a_ray_serve/                Ray Serve HTTP architecture, GR00T-N1.7-3B base
-  policy_server.py               Ray Serve deployment, FastAPI ingress
-  sim_worker.py                  Isaac Lab subprocess that queries policy via HTTP
-  g1_env.py                      Isaac Lab G1 wrapper, obs and action translation
-  run_demo.py                    Orchestrator for parallel rollouts
-  single_shot.py                 Self-contained end-to-end test
+policy_server.py            Ray Serve deployment with FastAPI ingress. Loads
+                            GR00T-N1.7-3B onto a GPU, exposes POST /predict.
+sim_worker.py               Isaac Lab subprocess launched as a Ray task. Boots
+                            the G1 pick-place scene and queries policy_server
+                            over HTTP.
+g1_env.py                   Isaac Lab G1 environment wrapper. Translates
+                            observations into the GR00T schema and the policy's
+                            action chunk into Isaac Lab's (1, 28) joint commands.
+run_demo.py                 Orchestrator for parallel rollouts.
 
-path_b_file_bridge/              File-bridge architecture, NVIDIA G1 fine-tune
-  n16_inference_server.py        Loads GR00T-N1.6-G1-PnPAppleToPlate
-  sim_runner_n16.py              Isaac Lab runner, file-bridged to inference
-  orchestrate_n16.sh             Launches both processes on one GPU worker
-
-demos/                           Pre-rendered demo GIFs
-  g1_groot_n17_zeroshot.gif      N1.7-3B base, REAL_G1 embodiment
-  g1_groot_n16_g1pnp.gif         N1.6 G1 fine-tune, UNITREE_G1 embodiment
-  g1_groot_n16_polished.gif      Same as above, post-processed
-  g1_groot_comparison.gif        Side-by-side N1.7 vs N1.6
-
-docker/
-  Dockerfile                     Cluster image: Isaac Sim 5.1 + Isaac Lab + GR00T
-
-tools/                           Helpers (token distribution, polish scripts, smoke tests)
+Dockerfile                  Cluster image: Isaac Sim 5.1 + Isaac Lab + GR00T,
+                            plus all runtime patches and pre-cached weights.
+setup_workers.sh            Helper that distributes HF_TOKEN to every worker.
 ```
 
 ## Running the notebook
 
 ### Cluster requirements
 
-- Anyscale workspace using the cluster image in `docker/Dockerfile`
+- Anyscale workspace using the cluster image built from `Dockerfile`
 - At least 2 GPU workers (A10G or better)
 - A Hugging Face token with access to `nvidia/Cosmos-Reason2-2B` (gated; accept terms at https://huggingface.co/nvidia/Cosmos-Reason2-2B)
 
@@ -85,26 +78,18 @@ tools/                           Helpers (token distribution, polish scripts, sm
 
 Total runtime on a warm cluster: roughly 3 minutes.
 
-## Path B: G1 pick-place fine-tune
-
-Path B uses NVIDIA's published G1 pick-place fine-tune `nvidia/GR00T-N1.6-G1-PnPAppleToPlate` instead of the N1.7-3B base model. It runs in a dedicated `groot-n16` conda env because N1.6's pinned dependencies conflict with Isaac Sim 5.1's torch pin. The two processes communicate via pickle files in `/tmp/bridge/`.
-
-```bash
-bash path_b_file_bridge/orchestrate_n16.sh
-```
-
 ## Required runtime patches
 
-Working with current pip versions against pinned model expectations needs four patches. All are baked into `docker/Dockerfile`:
+Working with current pip versions against pinned model expectations needs four patches. All are baked into `Dockerfile`:
 
 1. **VideoInput shim**: in transformers 4.54+, `VideoInput` was moved from `transformers.image_utils` to `transformers.video_utils`. GR00T's Eagle dynamic processor still imports from the old location.
 2. **flash_attention_2 force**: Qwen3 VLM asserts `_attn_implementation == "flash_attention_2"` but `AutoModel.from_config` does not propagate the `attn_implementation` kwarg through. Patched via `_BaseAutoModelClass.from_config`.
-3. **HF_TOKEN propagation**: Cosmos-Reason2-2B is gated. Worker subprocesses receive `HF_TOKEN` via Ray's `runtime_env={"env_vars": {"HF_TOKEN": ...}}`.
+3. **HF_TOKEN propagation**: Cosmos-Reason2-2B is gated. Worker subprocesses receive `HF_TOKEN` via Ray Serve's `ray_actor_options={"runtime_env": {"env_vars": {"HF_TOKEN": ...}}}`.
 4. **Pinocchio pre-import**: NVIDIA IsaacLab issue #4090. Pinocchio's C++ `std::vector<std::string>` binding gets corrupted after Isaac Lab loads a robot URDF. Workaround: `import pinocchio` before `AppLauncher`.
 
 ## Embodiment and obs/action schemas
 
-### N1.7 with `EmbodimentTag.REAL_G1`
+The repo uses GR00T's `EmbodimentTag.REAL_G1` schema for N1.7-3B.
 
 Obs (nested dict):
 
@@ -114,31 +99,9 @@ Obs (nested dict):
 
 Action: 40-step chunk with 9 keys (left and right wrist, arms, hands, waist, base height, navigate command).
 
-### N1.6 with `EmbodimentTag.UNITREE_G1`
-
-Obs (nested dict):
-
-- `video.ego_view`: `(B, 1, H, W, 3) uint8` (single frame)
-- `state`: 7 full-body keys (`left_leg`, `right_leg`, `waist`, `left_arm`, `right_arm`, `left_hand`, `right_hand`)
-- `language`: same as above
-
-Action: 30-step chunk with 7 keys (upper body and waist, plus base_height_command, navigate_command).
-
 ### Isaac Lab task action mapping
 
 `Isaac-PickPlace-FixedBaseUpperBodyIK-G1-Abs-v0` accepts actions of shape `(1, 28)`. The policy output packs as `left_arm(7) + right_arm(7) + left_hand(7) + right_hand(7) = 28`.
-
-## Joint index mapping (Isaac Lab 43-DOF G1 to N1.6 schema)
-
-```
-left_leg [6]:   [0, 3, 6, 9, 13, 17]    hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-right_leg [6]:  [1, 4, 7, 10, 14, 18]
-waist [3]:      [2, 5, 8]                yaw, roll, pitch
-left_arm [7]:   [11, 15, 19, 21, 23, 25, 27]   shoulder pitch/roll/yaw, elbow, wrist roll/pitch/yaw
-right_arm [7]:  [12, 16, 20, 22, 24, 26, 28]
-left_hand [7]:  [29, 35, 30, 36, 31, 37, 41]   index 0+1, middle 0+1, thumb 0+1+2
-right_hand [7]: [32, 38, 33, 39, 34, 40, 42]
-```
 
 ## Going further
 
@@ -157,6 +120,10 @@ results = ray.get([run_sim_rollout.remote(POLICY_URL) for _ in range(100)])
 ```
 
 Each rollout grabs a GPU worker, queries the shared policy fleet, and saves its own GIF.
+
+### Swap to the published G1 fine-tune
+
+NVIDIA's `nvidia/GR00T-N1.6-G1-PnPAppleToPlate` is post-trained on the apple-to-plate task. Loading it requires GR00T's N1.6 release branch and the `UNITREE_G1` embodiment schema (single-frame video, full-body state, 30-step action chunk). It runs on the same Ray Serve infrastructure.
 
 ## Acknowledgments
 
