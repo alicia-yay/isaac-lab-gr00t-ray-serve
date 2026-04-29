@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+
+# Anyscale
+.anyscaleignore
+
+# Outputs and logs
+demo_output/
+*.log
+
+# Environment
+.env
+
+# Downloaded tools
+gh_*.tar.gz
+gh_*_linux_*/
+*.whl
+
+# Editors
+.vscode/
+*.swp
+
+# Build helpers (already done their job)
+finalize.sh
