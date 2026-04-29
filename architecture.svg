@@ -5,6 +5,9 @@
     </marker>
   </defs>
 
+  <!-- Explicit white background -->
+  <rect x="0" y="0" width="680" height="600" fill="#FFFFFF"/>
+
   <rect x="20" y="40" width="640" height="400" rx="14" fill="none" stroke="#888780" stroke-width="0.5" stroke-dasharray="4 4"/>
   <text x="40" y="64" font-family="Arial, sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">Anyscale Ray cluster</text>
 
@@ -16,7 +19,7 @@
   <text x="125" y="264" font-family="Arial, sans-serif" font-size="12" fill="#854F0B" text-anchor="middle">Schedules tasks</text>
   <text x="125" y="282" font-family="Arial, sans-serif" font-size="12" fill="#854F0B" text-anchor="middle">Renders the GIF</text>
 
-  <!-- Policy worker (Ray Serve + GR00T) -->
+  <!-- Policy worker -->
   <rect x="240" y="170" width="200" height="160" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
   <text x="340" y="198" font-family="Arial, sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle">GPU worker A</text>
   <text x="340" y="218" font-family="Arial, sans-serif" font-size="12" fill="#534AB7" text-anchor="middle">running Ray Serve</text>
@@ -26,7 +29,7 @@
   <text x="340" y="288" font-family="Arial, sans-serif" font-size="12" fill="#534AB7" text-anchor="middle">FastAPI ingress</text>
   <text x="340" y="306" font-family="Arial, sans-serif" font-size="12" fill="#534AB7" text-anchor="middle">POST /predict</text>
 
-  <!-- Sim worker (Isaac Lab) -->
+  <!-- Sim worker -->
   <rect x="470" y="170" width="180" height="160" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
   <text x="560" y="198" font-family="Arial, sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle">GPU worker B</text>
   <text x="560" y="218" font-family="Arial, sans-serif" font-size="12" fill="#0F6E56" text-anchor="middle">running Ray task</text>
