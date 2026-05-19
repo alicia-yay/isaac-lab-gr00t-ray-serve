@@ -42,7 +42,7 @@ Ray Serve handles GR00T inference scaling. Ray tasks fan out the Isaac Lab simul
 ## Repo layout
 
 ```
-groot_demo.ipynb            The demo notebook. Open this and run top to bottom.
+groot_demo.ipynb            The demo notebook. Open this and run top to bottom (or module3_groot_ray_workshop.ipynb)
 architecture.svg            Architecture diagram embedded in the README.
 g1_groot_n17_zeroshot.gif   Pre-recorded rollout displayed in the notebook.
 
@@ -65,14 +65,14 @@ setup_workers.sh            Helper that distributes HF_TOKEN to every worker.
 
 ### Cluster requirements
 
-- Anyscale workspace using the cluster image built from `Dockerfile`
-- At least 2 GPU workers (A10G or better)
+- Anyscale workspace using `anyscale/image/isaaclab-ray-simeval:1` (built from `Dockerfile`)
+- At least 2 GPU workers with 24 GB VRAM (L4 or A10G); 4 workers recommended
 - A Hugging Face token with access to `nvidia/Cosmos-Reason2-2B` (gated; accept terms at https://huggingface.co/nvidia/Cosmos-Reason2-2B)
 
 ### Steps
 
 1. Start the cluster with the custom image
-2. Open `groot_demo.ipynb` in Anyscale's JupyterLab
+2. Open `module3_groot_ray_workshop.ipynb` in Anyscale's JupyterLab
 3. Set `HF_TOKEN` in the Step 0 cell
 4. Run cells top to bottom
 

@@ -8,3 +8,13 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
+
+# Local rollout artifacts
+live_rollout.gif
+live_rollout.mp4
+latest_rollout.gif
+latest_rollout.mp4
+rollout_*.gif
+rollout_*.mp4
+g1_env.py.bak
+*.bak
